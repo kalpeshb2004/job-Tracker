@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from app import models
 from app.database import engine, Base
 
+from app.routers import auth
+
 Base.metadata.create_all(bind=engine)
 
 from app.database import get_db
@@ -18,6 +20,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
 
 
 @app.get("/")
