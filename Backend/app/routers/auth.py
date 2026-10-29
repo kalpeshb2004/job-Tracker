@@ -13,7 +13,7 @@ from app.security import (
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-
+# register api
 @router.post("/register", response_model=schemas.UserOut, status_code=201)
 def register(data: schemas.UserCreate, db: Session = Depends(get_db)):
     email = data.email.lower()
@@ -31,6 +31,7 @@ def register(data: schemas.UserCreate, db: Session = Depends(get_db)):
     return user
 
 
+# login api 
 @router.post("/login", response_model=schemas.Token)
 def login(
     form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
@@ -45,6 +46,7 @@ def login(
     return {"access_token": token, "token_type": "bearer"}
 
 
+# current user 
 @router.get("/me", response_model=schemas.UserOut)
 def me(current_user: models.User = Depends(get_current_user)):
     return current_user

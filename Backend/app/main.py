@@ -8,6 +8,8 @@ from app.database import engine, Base
 
 from app.routers import auth
 
+from app.routers import auth, applications
+
 Base.metadata.create_all(bind=engine)
 
 from app.database import get_db
@@ -22,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(applications.router)
 
 
 @app.get("/")
