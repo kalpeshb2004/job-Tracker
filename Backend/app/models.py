@@ -5,6 +5,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+from datetime import date, datetime
+from pydantic import BaseModel, ConfigDict
 
 
 class User(Base):
@@ -60,3 +62,33 @@ class FollowUp(Base):
     reminder_sent = Column(Boolean, nullable=False, default=False)
 
     application = relationship("Application", back_populates="followups")
+
+
+from datetime import date  # note: date, not datetime; your columns are Date
+
+class FollowUpCreate(BaseModel):
+    application_id: int
+    followup_date: date
+    note: str | None = None
+
+
+class FollowUpUpdate(BaseModel):
+    followup_date: date | None = None
+    note: str | None = None
+    is_done: bool | None = None
+
+
+class FollowUpOut(BaseModel):
+    id: int
+    application_id: int
+    followup_date: date
+    note: str | None = None
+    is_done: bool
+    reminder_sent: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UpcomingFollowUpOut(FollowUpOut):
+    company: str
+    role_title: str

@@ -10,6 +10,7 @@ from app.security import get_current_user
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
 
+# ---------- Helper (not an API) ----------
 def get_owned_application(
     app_id: int, db: Session, user: models.User
 ) -> models.Application:
@@ -24,6 +25,8 @@ def get_owned_application(
     return application
 
 
+# ---------- API 1: POST /applications ----------
+# Add new job application
 @router.post("", response_model=schemas.ApplicationOut, status_code=201)
 def create_application(
     data: schemas.ApplicationCreate,
@@ -41,6 +44,8 @@ def create_application(
     return application
 
 
+# ---------- API 2: GET /applications ----------
+# List my applications. Filter by status, search company, pagination
 @router.get("", response_model=list[schemas.ApplicationOut])
 def list_applications(
     status: schemas.Status | None = None,
@@ -65,6 +70,8 @@ def list_applications(
     )
 
 
+# ---------- API 3: GET /applications/{app_id} ----------
+# Get one application
 @router.get("/{app_id}", response_model=schemas.ApplicationOut)
 def get_application(
     app_id: int,
@@ -74,6 +81,8 @@ def get_application(
     return get_owned_application(app_id, db, user)
 
 
+# ---------- API 4: PUT /applications/{app_id} ----------
+# Edit application. Partial update: only fields client sent
 @router.put("/{app_id}", response_model=schemas.ApplicationOut)
 def update_application(
     app_id: int,
@@ -99,6 +108,8 @@ def update_application(
     return application
 
 
+# ---------- API 5: PATCH /applications/{app_id}/status ----------
+# Move application to new stage (Applied → Interview → Offer ...)
 @router.patch("/{app_id}/status", response_model=schemas.ApplicationOut)
 def update_status(
     app_id: int,
@@ -113,6 +124,8 @@ def update_status(
     return application
 
 
+# ---------- API 6: DELETE /applications/{app_id} ----------
+# Delete application. Its follow-ups also deleted (cascade)
 @router.delete("/{app_id}", status_code=204)
 def delete_application(
     app_id: int,

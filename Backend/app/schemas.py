@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 from datetime import date, datetime
+from pydantic import BaseModel, ConfigDict
 from typing import Literal
 
 # Allowed stages. Wrong value → FastAPI auto return 422.
@@ -70,3 +71,29 @@ class ApplicationOut(BaseModel):
     job_description: str | None
     match_score: float | None
     created_at: datetime | None
+
+class FollowUpCreate(BaseModel):
+    followup_date: date
+    note: str | None = None
+
+
+class FollowUpUpdate(BaseModel):
+    followup_date: date | None = None
+    note: str | None = None
+    is_done: bool | None = None
+
+
+class FollowUpOut(BaseModel):
+    id: int
+    application_id: int
+    followup_date: date
+    note: str | None = None
+    is_done: bool
+    reminder_sent: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UpcomingFollowUpOut(FollowUpOut):
+    company: str
+    role_title: str

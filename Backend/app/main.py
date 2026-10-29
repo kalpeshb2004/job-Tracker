@@ -4,15 +4,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app import models
-from app.database import engine, Base
+from app.database import get_db, engine, Base
+from app.routers import auth, applications, followups
 
-from app.routers import auth
-
-from app.routers import auth, applications
-
+# Create missing tables on startup (models must be imported above)
 Base.metadata.create_all(bind=engine)
-
-from app.database import get_db
 
 app = FastAPI(title="Job Application Tracker")
 
@@ -23,16 +19,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register routers = connect each API group to the app
 app.include_router(auth.router)
 app.include_router(applications.router)
+app.include_router(followups.router)
 
 
-@app.get("/")
+@app.get("/", tags=["Health"])
 def root():
     return {"message": "Job Tracker API is running"}
 
 
-@app.get("/health/db")
+@app.get("/health/db", tags=["Health"])
 def db_health(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
     return {"database": "connected"}
