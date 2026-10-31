@@ -5,9 +5,8 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.database import get_db, engine, Base
-from app.routers import auth, applications, followups, dashboard
+from app.routers import auth, applications, followups, dashboard,admin
 
-from app.routers import auth, applications, followups, admin
 
 # Create missing tables on startup (models must be imported above)
 Base.metadata.create_all(bind=engine)

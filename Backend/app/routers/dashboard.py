@@ -65,3 +65,19 @@ def timeline(
         .all()
     )
     return [schemas.TimelinePointOut(month=m, count=c) for m, c in rows]
+
+# ---------- Dashboard ----------
+class DashboardStatsOut(BaseModel):
+    total: int
+    by_status: dict[str, int]
+
+
+class ResponseRateOut(BaseModel):
+    total: int
+    responded: int
+    response_rate: float  # percent, e.g. 28.0
+
+
+class TimelinePointOut(BaseModel):
+    month: str  # "2026-10"
+    count: int

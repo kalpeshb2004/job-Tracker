@@ -10,6 +10,7 @@ from app.security import require_admin
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
+
 # dependencies=[...] = EVERY route in this router is admin-only (403 for normal user)
 router = APIRouter(
     prefix="/admin",
