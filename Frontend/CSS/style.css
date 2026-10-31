@@ -150,3 +150,69 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   color: #f5b83d;
 }
 .ring-note { font-size: 13px; color: var(--muted); text-align: center; }
+
+/* ---------- Applications page ---------- */
+select, textarea {
+  width: 100%;
+  padding: 11px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+}
+select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+textarea { resize: vertical; min-height: 70px; }
+
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.toolbar { display: flex; gap: 12px; margin: 18px 0; }
+.toolbar input { flex: 1; }
+.toolbar select { width: 180px; }
+
+.table-wrap { overflow-x: auto; padding: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th {
+  text-align: left;
+  padding: 12px 14px;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+td.company { font-weight: 600; }
+td.actions { white-space: nowrap; }
+td.actions button { margin-right: 6px; }
+td .overdue { color: var(--danger); font-weight: 600; }
+td select { width: auto; padding: 6px 8px; font-size: 13px; }
+
+.btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+.btn-danger:hover { background: var(--danger); color: #fff; }
+
+.pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; color: var(--muted); font-size: 14px; }
+
+dialog {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  width: min(580px, 92vw);
+  margin: auto;
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
+dialog h2 { font-size: 20px; color: var(--text); margin-bottom: 4px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.form-grid .full { grid-column: 1 / -1; }
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+.form-actions button { margin: 0; }
+
+@media (max-width: 600px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .toolbar { flex-direction: column; }
+  .toolbar select { width: 100%; }
+}

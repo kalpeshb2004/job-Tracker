@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Applications | Job Tracker</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav class="nav">
+    <span class="brand">Job Tracker</span>
+    <div class="links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="applications.html" class="active">Applications</a>
+      <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+      <button class="btn-sm btn-ghost" id="logoutBtn">Logout</button>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-head">
+      <div>
+        <h1>Applications</h1>
+        <p class="sub">Add, update and track every job you applied to</p>
+      </div>
+      <button class="btn-sm" id="newBtn">+ New application</button>
+    </div>
+
+    <div id="banner" class="banner hidden"></div>
+
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search company..." />
+      <select id="statusFilter"></select>
+    </div>
+
+    <div class="card table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th><th>Role</th><th>Stage</th>
+            <th>Applied</th><th>Deadline</th><th>Source</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <p class="empty hidden" id="empty" style="padding:18px">No applications found.</p>
+    </div>
+
+    <div class="pager">
+      <button class="btn-sm btn-ghost" id="prevBtn">Prev</button>
+      <span id="pageInfo">Page 1</span>
+      <button class="btn-sm btn-ghost" id="nextBtn">Next</button>
+    </div>
+  </main>
+
+  <!-- Add / Edit popup -->
+  <dialog id="dlg">
+    <form id="form">
+      <h2 id="dlgTitle">New application</h2>
+      <div class="form-grid">
+        <div>
+          <label for="fCompany">Company *</label>
+          <input id="fCompany" required maxlength="150" />
+        </div>
+        <div>
+          <label for="fRole">Role *</label>
+          <input id="fRole" required maxlength="150" />
+        </div>
+        <div>
+          <label for="fStatus">Stage</label>
+          <select id="fStatus"></select>
+        </div>
+        <div>
+          <label for="fSource">Source</label>
+          <input id="fSource" maxlength="50" placeholder="LinkedIn, Naukri, Referral..." />
+        </div>
+        <div>
+          <label for="fApplied">Applied date</label>
+          <input type="date" id="fApplied" />
+        </div>
+        <div>
+          <label for="fDeadline">Deadline</label>
+          <input type="date" id="fDeadline" />
+        </div>
+        <div class="full">
+          <label for="fNotes">Notes</label>
+          <textarea id="fNotes"></textarea>
+        </div>
+        <div class="full">
+          <label for="fJd">Job description (used later for resume match)</label>
+          <textarea id="fJd" rows="4"></textarea>
+        </div>
+      </div>
+      <p class="msg error" id="formMsg"></p>
+      <div class="form-actions">
+        <button type="button" class="btn-sm btn-ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn-sm" id="saveBtn">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/api.js"></script>
+  <script>
+    Auth.requireLogin();
+
+    const $ = (id) => document.getElementById(id);
+    const STATUSES = ["Applied", "Screening", "Interview", "Offer", "Accepted", "Rejected"];
+    const PAGE_SIZE = 10;
+
+    let page = 0;
+    let hasNext = false;
+    let rows = [];
+    let reqId = 0;        // ignore stale responses when user types fast
+    let editingId = null; // null = creating, number = editing
+
+    function showError(text) {
+      $("banner").textContent = text;     // textContent = XSS safe
+      $("banner").classList.remove("hidden");
+    }
+    function clearError() { $("banner").classList.add("hidden"); }
+
+    function todayStr() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    function fillOptions(select, withAll) {
+      select.replaceChildren();
+      if (withAll) {
+        const o = document.createElement("option");
+        o.value = "";
+        o.textContent = "All stages";
+        select.appendChild(o);
+      }
+      STATUSES.forEach((s) => {
+        const o = document.createElement("option");
+        o.value = s;
+        o.textContent = s;
+        select.appendChild(o);
+      });
+    }
+
+    function cell(text, className) {
+      const td = document.createElement("td");
+      if (className) td.className = className;
+      td.textContent = text ?? "-";
+      return td;
+    }
+
+    // ---------- Load list (API: GET /applications) ----------
+    async function load() {
+      const my = ++reqId;
+      // Ask for 1 extra row. If it comes back, a next page exists.
+      const params = new URLSearchParams({ limit: PAGE_SIZE + 1, offset: page * PAGE_SIZE });
+      if ($("statusFilter").value) params.set("status", $("statusFilter").value);
+      const q = $("search").value.trim();
+      if (q) params.set("search", q);
+
+      try {
+        const data = await apiFetch(`/applications?${params}`);
+        if (my !== reqId) return;
+        clearError();
+        hasNext = data.length > PAGE_SIZE;
+        rows = data.slice(0, PAGE_SIZE);
+        render();
+      } catch (err) {
+        if (my === reqId) showError(err.message);
+      }
+    }
+
+    function render() {
+      const tbody = $("tbody");
+      tbody.replaceChildren();
+      $("empty").classList.toggle("hidden", rows.length > 0);
+
+      const today = todayStr();
+      rows.forEach((a) => {
+        const tr = document.createElement("tr");
+        tr.append(cell(a.company, "company"), cell(a.role_title));
+
+        // Stage dropdown → API: PATCH /applications/{id}/status
+        const tdStage = document.createElement("td");
+        const sel = document.createElement("select");
+        fillOptions(sel, false);
+        sel.value = a.status;
+        sel.addEventListener("change", async () => {
+          const old = a.status;
+          try {
+            const updated = await apiFetch(`/applications/${a.id}/status`, {
+              method: "PATCH",
+              json: { status: sel.value },
+            });
+            a.status = updated.status;
+            clearError();
+          } catch (err) {
+            sel.value = old;   // revert on failure
+            showError(err.message);
+          }
+        });
+        tdStage.appendChild(sel);
+        tr.appendChild(tdStage);
+
+        tr.appendChild(cell(a.applied_date));
+
+        const tdDead = cell(a.deadline);
+        if (a.deadline && a.deadline < today && ["Applied", "Screening"].includes(a.status)) {
+          tdDead.className = "overdue";
+        }
+        tr.appendChild(tdDead);
+
+        tr.appendChild(cell(a.source));
+
+        const tdAct = document.createElement("td");
+        tdAct.className = "actions";
+        const edit = document.createElement("button");
+        edit.className = "btn-sm btn-ghost";
+        edit.textContent = "Edit";
+        edit.addEventListener("click", () => openForm(a));
+        const del = document.createElement("button");
+        del.className = "btn-sm btn-danger";
+        del.textContent = "Delete";
+        del.addEventListener("click", () => removeApp(a));
+        tdAct.append(edit, del);
+        tr.appendChild(tdAct);
+
+        tbody.appendChild(tr);
+      });
+
+      $("pageInfo").textContent = `Page ${page + 1}`;
+      $("prevBtn").disabled = page === 0;
+      $("nextBtn").disabled = !hasNext;
+    }
+
+    // ---------- Delete (API: DELETE /applications/{id}) ----------
+    async function removeApp(a) {
+      if (!confirm(`Delete "${a.company}" application? Its follow-ups are deleted too.`)) return;
+      try {
+        await apiFetch(`/applications/${a.id}`, { method: "DELETE" });
+        if (rows.length === 1 && page > 0) page--;   // last row on page → go back
+        load();
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    // ---------- Add / Edit popup ----------
+    function openForm(a) {
+      editingId = a ? a.id : null;
+      $("dlgTitle").textContent = a ? "Edit application" : "New application";
+      $("fCompany").value = a?.company ?? "";
+      $("fRole").value = a?.role_title ?? "";
+      $("fStatus").value = a?.status ?? "Applied";
+      $("fSource").value = a?.source ?? "";
+      $("fApplied").value = a?.applied_date ?? "";
+      $("fDeadline").value = a?.deadline ?? "";
+      $("fNotes").value = a?.notes ?? "";
+      $("fJd").value = a?.job_description ?? "";
+      $("formMsg").textContent = "";
+      $("dlg").showModal();
+    }
+
+    $("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = $("saveBtn");
+      btn.disabled = true;
+      $("formMsg").textContent = "";
+
+      // Empty text → null, so backend stores NULL, not ""
+      const orNull = (v) => (v.trim() === "" ? null : v.trim());
+      const payload = {
+        company: $("fCompany").value.trim(),
+        role_title: $("fRole").value.trim(),
+        status: $("fStatus").value,
+        source: orNull($("fSource").value),
+        applied_date: $("fApplied").value || null,
+        deadline: $("fDeadline").value || null,
+        notes: orNull($("fNotes").value),
+        job_description: orNull($("fJd").value),
+      };
+
+      try {
+        if (editingId === null) {
+          await apiFetch("/applications", { method: "POST", json: payload });   // API: POST
+          page = 0;
+        } else {
+          await apiFetch(`/applications/${editingId}`, { method: "PUT", json: payload });   // API: PUT
+        }
+        $("dlg").close();
+        load();
+      } catch (err) {
+        $("formMsg").textContent = err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ---------- Events ----------
+    $("newBtn").addEventListener("click", () => openForm(null));
+    $("cancelBtn").addEventListener("click", () => $("dlg").close());
+    $("dlg").addEventListener("click", (e) => { if (e.target === $("dlg")) $("dlg").close(); });
+
+    $("prevBtn").addEventListener("click", () => { if (page > 0) { page--; load(); } });
+    $("nextBtn").addEventListener("click", () => { if (hasNext) { page++; load(); } });
+
+    $("statusFilter").addEventListener("change", () => { page = 0; load(); });
+
+    let timer;   // debounce: wait 300ms after typing stops
+    $("search").addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { page = 0; load(); }, 300);
+    });
+
+    $("logoutBtn").addEventListener("click", () => Auth.logout());
+
+    // ---------- Start ----------
+    fillOptions($("statusFilter"), true);
+    fillOptions($("fStatus"), false);
+    apiFetch("/auth/me")
+      .then((me) => { if (me.role === "admin") $("adminLink").classList.remove("hidden"); })
+      .catch(() => {});
+    load();
+  </script>
+</body>
+</html>
