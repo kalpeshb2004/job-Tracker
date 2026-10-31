@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register | Job Tracker</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <h1>Create account</h1>
+      <p class="sub">Start tracking your applications</p>
+
+      <form id="registerForm">
+        <label for="name">Name</label>
+        <input type="text" id="name" required minlength="2" maxlength="100" />
+
+        <label for="email">Email</label>
+        <input type="email" id="email" required autocomplete="username" />
+
+        <label for="password">Password (min 6 characters)</label>
+        <input type="password" id="password" required minlength="6" maxlength="50" autocomplete="new-password" />
+
+        <button type="submit" id="submitBtn">Register</button>
+        <p class="msg" id="msg"></p>
+      </form>
+
+      <p class="switch">Already have an account? <a href="login.html">Login</a></p>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    const form = document.getElementById("registerForm");
+    const msg = document.getElementById("msg");
+    const btn = document.getElementById("submitBtn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.textContent = "";
+      msg.className = "msg";
+      btn.disabled = true;
+
+      try {
+        await apiFetch("/auth/register", {
+          method: "POST",
+          json: {
+            name: document.getElementById("name").value.trim(),
+            email: document.getElementById("email").value.trim(),
+            password: document.getElementById("password").value,
+          },
+        });
+        msg.textContent = "Account created. Redirecting to login...";
+        msg.className = "msg success";
+        setTimeout(() => (window.location.href = "login.html"), 1200);
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.className = "msg error";
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

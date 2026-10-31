@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login | Job Tracker</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <h1>Welcome back</h1>
+      <p class="sub">Login to track your job applications</p>
+
+      <form id="loginForm">
+        <label for="email">Email</label>
+        <input type="email" id="email" required autocomplete="username" />
+
+        <label for="password">Password</label>
+        <input type="password" id="password" required autocomplete="current-password" />
+
+        <button type="submit" id="submitBtn">Login</button>
+        <p class="msg" id="msg"></p>
+      </form>
+
+      <p class="switch">No account? <a href="register.html">Register</a></p>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    // Already logged in → skip login page
+    if (Auth.getToken()) window.location.href = "dashboard.html";
+
+    const form = document.getElementById("loginForm");
+    const msg = document.getElementById("msg");
+    const btn = document.getElementById("submitBtn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.textContent = "";
+      msg.className = "msg";
+      btn.disabled = true;
+      btn.textContent = "Logging in...";
+
+      try {
+        // Backend login expects FORM data (OAuth2), not JSON
+        const body = new URLSearchParams({
+          username: document.getElementById("email").value.trim(),
+          password: document.getElementById("password").value,
+        });
+
+        const data = await apiFetch("/auth/login", { method: "POST", body });
+        Auth.setToken(data.access_token);
+        window.location.href = "dashboard.html";
+      } catch (err) {
+        msg.textContent = err.message;   // textContent, not innerHTML = no XSS
+        msg.className = "msg error";
+        btn.disabled = false;
+        btn.textContent = "Login";
+      }
+    });
+  </script>
+</body>
+</html>

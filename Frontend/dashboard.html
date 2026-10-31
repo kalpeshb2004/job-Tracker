@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard | Job Tracker</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="page">
+    <h1 id="hello">Loading...</h1>
+    <p class="sub" id="info"></p>
+    <button id="logoutBtn">Logout</button>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    Auth.requireLogin();
+
+    (async () => {
+      try {
+        const me = await apiFetch("/auth/me");
+        document.getElementById("hello").textContent = `Hello, ${me.name}`;
+        document.getElementById("info").textContent = `${me.email} (${me.role})`;
+      } catch (err) {
+        document.getElementById("hello").textContent = err.message;
+      }
+    })();
+
+    document.getElementById("logoutBtn").addEventListener("click", () => Auth.logout());
+  </script>
+</body>
+</html>
