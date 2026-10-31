@@ -134,3 +134,16 @@ class AdminUserOut(BaseModel):
 
 class AdminUserStatusUpdate(BaseModel):
     is_active: bool
+
+class AdminApplicationOut(BaseModel):
+    # Summary only. No notes / job_description (user's private data)
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    company: str
+    role_title: str
+    status: str
+    applied_date: date | None
+    source: str | None
+    created_at: datetime | None

@@ -147,3 +147,30 @@ def delete_user(
     db.delete(user)  # ORM cascade removes applications → follow-ups
     db.commit()
     return Response(status_code=204)
+
+# ---------- Admin API 5: GET /admin/users/{user_id}/applications ----------
+# Admin view of one user's applications. Summary fields only (privacy)
+@router.get(
+    "/users/{user_id}/applications",
+    response_model=list[schemas.AdminApplicationOut],
+)
+def list_user_applications(
+    user_id: int,
+    status: schemas.Status | None = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    if db.get(models.User, user_id) is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    query = db.query(models.Application).filter(models.Application.user_id == user_id)
+    if status:
+        query = query.filter(models.Application.status == status)
+
+    return (
+        query.order_by(models.Application.created_at.desc(), models.Application.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
