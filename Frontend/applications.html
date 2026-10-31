@@ -99,6 +99,21 @@
     </form>
   </dialog>
 
+    <!-- Follow-ups popup -->
+  <dialog id="fuDlg" class="wide">
+    <div class="dlg-head">
+      <h2 id="fuTitle">Follow-ups</h2>
+      <button class="btn-sm btn-ghost" id="fuClose">Close</button>
+    </div>
+    <form id="fuForm" class="fu-form">
+      <input type="date" id="fuDate" required />
+      <input id="fuNote" maxlength="255" placeholder="Note (e.g. Email HR for update)" />
+      <button type="submit" class="btn-sm" id="fuAdd">Add</button>
+    </form>
+    <div id="fuList"></div>
+    <p class="msg error" id="fuMsg"></p>
+  </dialog>
+
   <script src="js/api.js"></script>
   <script>
     Auth.requireLogin();
@@ -220,7 +235,11 @@
         del.className = "btn-sm btn-danger";
         del.textContent = "Delete";
         del.addEventListener("click", () => removeApp(a));
-        tdAct.append(edit, del);
+        const fu = document.createElement("button");
+        fu.className = "btn-sm btn-ghost";
+        fu.textContent = "Follow-ups";
+        fu.addEventListener("click", () => openFollowups(a));
+        tdAct.append(fu, edit, del);
         tr.appendChild(tdAct);
 
         tbody.appendChild(tr);
@@ -294,6 +313,120 @@
       }
     });
 
+        // ---------- Follow-ups popup ----------
+    let fuAppId = null;
+
+    async function openFollowups(a) {
+      fuAppId = a.id;
+      $("fuTitle").textContent = `Follow-ups · ${a.company}`;
+      $("fuMsg").textContent = "";
+      $("fuDate").value = todayStr();
+      $("fuNote").value = "";
+      $("fuDlg").showModal();
+      await loadFollowups();
+    }
+
+    // API: GET /applications/{id}/followups
+    async function loadFollowups() {
+      try {
+        renderFollowups(await apiFetch(`/applications/${fuAppId}/followups`));
+      } catch (err) {
+        $("fuMsg").textContent = err.message;
+      }
+    }
+
+    function renderFollowups(items) {
+      const box = $("fuList");
+      box.replaceChildren();
+
+      if (items.length === 0) {
+        const p = document.createElement("p");
+        p.className = "empty";
+        p.textContent = "No follow-ups yet. Add one above.";
+        box.appendChild(p);
+        return;
+      }
+
+      const today = todayStr();
+      items.forEach((f) => {
+        const row = document.createElement("div");
+        row.className = f.is_done ? "followup done" : "followup";
+
+        const left = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "title";
+        title.textContent = f.note || "No note";
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = f.is_done ? "Done" : "Pending";
+        left.append(title, meta);
+
+        const date = document.createElement("div");
+        date.className = "date";
+        const overdue = !f.is_done && f.followup_date < today;
+        if (overdue) date.classList.add("overdue");
+        date.textContent = overdue ? `Overdue · ${f.followup_date}` : f.followup_date;
+
+        const actions = document.createElement("div");
+        actions.className = "row-actions";
+
+        // API: PUT /followups/{id}  (mark done / undo)
+        const toggle = document.createElement("button");
+        toggle.className = "btn-sm btn-ghost";
+        toggle.textContent = f.is_done ? "Undo" : "Done";
+        toggle.addEventListener("click", async () => {
+          try {
+            await apiFetch(`/followups/${f.id}`, { method: "PUT", json: { is_done: !f.is_done } });
+            loadFollowups();
+          } catch (err) {
+            $("fuMsg").textContent = err.message;
+          }
+        });
+
+        // API: DELETE /followups/{id}
+        const del = document.createElement("button");
+        del.className = "btn-sm btn-danger";
+        del.textContent = "Delete";
+        del.addEventListener("click", async () => {
+          if (!confirm("Delete this follow-up?")) return;
+          try {
+            await apiFetch(`/followups/${f.id}`, { method: "DELETE" });
+            loadFollowups();
+          } catch (err) {
+            $("fuMsg").textContent = err.message;
+          }
+        });
+
+        actions.append(toggle, del);
+        row.append(left, date, actions);
+        box.appendChild(row);
+      });
+    }
+
+    // API: POST /applications/{id}/followups
+    $("fuForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = $("fuAdd");
+      btn.disabled = true;
+      $("fuMsg").textContent = "";
+      try {
+        const note = $("fuNote").value.trim();
+        await apiFetch(`/applications/${fuAppId}/followups`, {
+          method: "POST",
+          json: { followup_date: $("fuDate").value, note: note || null },
+        });
+        $("fuNote").value = "";
+        loadFollowups();
+      } catch (err) {
+        $("fuMsg").textContent = err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $("fuClose").addEventListener("click", () => $("fuDlg").close());
+    $("fuDlg").addEventListener("click", (e) => { if (e.target === $("fuDlg")) $("fuDlg").close(); });
+    
     // ---------- Events ----------
     $("newBtn").addEventListener("click", () => openForm(null));
     $("cancelBtn").addEventListener("click", () => $("dlg").close());

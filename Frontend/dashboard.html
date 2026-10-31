@@ -7,27 +7,215 @@
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <div class="page">
-    <h1 id="hello">Loading...</h1>
-    <p class="sub" id="info"></p>
-    <button id="logoutBtn">Logout</button>
-  </div>
+  <nav class="nav">
+    <span class="brand">Job Tracker</span>
+    <div class="links">
+      <a href="dashboard.html" class="active">Dashboard</a>
+      <a href="applications.html">Applications</a>
+      <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+      <button class="btn-sm btn-ghost" id="logoutBtn">Logout</button>
+    </div>
+  </nav>
 
+  <main class="container">
+    <h1 id="hello">Dashboard</h1>
+    <p class="sub">Your job search at a glance</p>
+
+    <div id="banner" class="banner hidden"></div>
+
+    <!-- Stage cards -->
+    <section class="grid stages" id="stages"></section>
+
+    <section class="grid two-col">
+      <!-- Response rate ring -->
+      <div class="card">
+        <h2>Response rate</h2>
+        <div class="ring-wrap">
+          <div class="ring" id="ring"><div class="ring-inner" id="ringText">0%</div></div>
+          <p class="ring-note" id="ringNote"></p>
+        </div>
+      </div>
+
+      <!-- Timeline chart -->
+      <div class="card">
+        <h2>Applications per month</h2>
+        <div class="chart-box"><canvas id="timelineChart"></canvas></div>
+        <p class="empty hidden" id="timelineEmpty">No applications with a date yet.</p>
+      </div>
+    </section>
+
+    <!-- Upcoming follow-ups -->
+    <section class="card" style="margin-top:16px">
+      <h2>Upcoming follow-ups (next 7 days + overdue)</h2>
+      <div id="followups"></div>
+    </section>
+  </main>
+
+  <!-- Pinned version. Chart.js draws the line chart. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="js/api.js"></script>
   <script>
     Auth.requireLogin();
 
+    const STAGES = ["Applied", "Screening", "Interview", "Offer", "Accepted"];
+    const $ = (id) => document.getElementById(id);
+
+    function showError(text) {
+      const b = $("banner");
+      b.textContent = text;          // textContent = XSS safe
+      b.classList.remove("hidden");
+    }
+
+    function todayStr() {
+      const d = new Date();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${d.getFullYear()}-${m}-${day}`;
+    }
+
+    // ---------- Stage cards ----------
+    function renderStages(stats) {
+      const box = $("stages");
+      box.replaceChildren();
+      STAGES.forEach((stage) => {
+        const card = document.createElement("div");
+        card.className = "card stage-card";
+
+        const num = document.createElement("div");
+        num.className = "num";
+        num.textContent = stats.by_status[stage] ?? 0;
+
+        const label = document.createElement("div");
+        label.className = "label";
+        label.textContent = stage;
+
+        card.append(num, label);
+        box.appendChild(card);
+      });
+    }
+
+    // ---------- Response rate ring ----------
+    function renderRate(rate) {
+      $("ring").style.setProperty("--pct", rate.response_rate);
+      $("ringText").textContent = `${rate.response_rate}%`;
+      $("ringNote").textContent =
+        `${rate.responded} of ${rate.total} applications got a response`;
+    }
+
+    // ---------- Timeline chart ----------
+    function renderTimeline(points) {
+      if (points.length === 0) {
+        $("timelineEmpty").classList.remove("hidden");
+        return;
+      }
+      new Chart($("timelineChart"), {
+        type: "line",
+        data: {
+          labels: points.map((p) => p.month),
+          datasets: [{
+            label: "Applications",
+            data: points.map((p) => p.count),
+            borderColor: "#3b82f6",
+            backgroundColor: "rgba(59,130,246,0.15)",
+            fill: true,
+            tension: 0.35,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0, color: "#8a9ab5" }, grid: { color: "#22304a" } },
+            x: { ticks: { color: "#8a9ab5" }, grid: { display: false } },
+          },
+        },
+      });
+    }
+
+    // ---------- Follow-ups ----------
+    function renderFollowups(items) {
+      const box = $("followups");
+      box.replaceChildren();
+
+      if (items.length === 0) {
+        const p = document.createElement("p");
+        p.className = "empty";
+        p.textContent = "Nothing due. You are all caught up.";
+        box.appendChild(p);
+        return;
+      }
+
+      const today = todayStr();
+      items.forEach((f) => {
+        const row = document.createElement("div");
+        row.className = "followup";
+
+        const left = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "title";
+        title.textContent = `${f.company} · ${f.role_title}`;
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = f.note || "No note";
+        left.append(title, meta);
+
+        const date = document.createElement("div");
+        date.className = "date";
+        const overdue = f.followup_date < today;   // YYYY-MM-DD compares as text
+        if (overdue) date.classList.add("overdue");
+        date.textContent = overdue ? `Overdue · ${f.followup_date}` : f.followup_date;
+
+        const btn = document.createElement("button");
+        btn.className = "btn-sm btn-ghost";
+        btn.textContent = "Done";
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          try {
+            await apiFetch(`/followups/${f.id}`, { method: "PUT", json: { is_done: true } });
+            loadFollowups();
+          } catch (err) {
+            btn.disabled = false;
+            showError(err.message);
+          }
+        });
+
+        row.append(left, date, btn);
+        box.appendChild(row);
+      });
+    }
+
+    async function loadFollowups() {
+      try {
+        renderFollowups(await apiFetch("/followups/upcoming?days=7"));
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    // ---------- Load everything at once ----------
     (async () => {
       try {
-        const me = await apiFetch("/auth/me");
-        document.getElementById("hello").textContent = `Hello, ${me.name}`;
-        document.getElementById("info").textContent = `${me.email} (${me.role})`;
+        const [me, stats, rate, timeline] = await Promise.all([
+          apiFetch("/auth/me"),
+          apiFetch("/dashboard/stats"),
+          apiFetch("/dashboard/response-rate"),
+          apiFetch("/dashboard/timeline"),
+        ]);
+
+        $("hello").textContent = `Hello, ${me.name}`;
+        if (me.role === "admin") $("adminLink").classList.remove("hidden");
+
+        renderStages(stats);
+        renderRate(rate);
+        renderTimeline(timeline);
       } catch (err) {
-        document.getElementById("hello").textContent = err.message;
+        showError(err.message);
       }
+      loadFollowups();
     })();
 
-    document.getElementById("logoutBtn").addEventListener("click", () => Auth.logout());
+    $("logoutBtn").addEventListener("click", () => Auth.logout());
   </script>
 </body>
 </html>

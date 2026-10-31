@@ -244,3 +244,11 @@ dialog .dlg-head button { margin: 0; }
   .cols3 { grid-template-columns: 1fr; }
   .cols6 { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ---------- Follow-ups popup ---------- */
+.fu-form { display: flex; gap: 10px; margin-bottom: 16px; }
+.fu-form input[type="date"] { width: 170px; flex: none; }
+.fu-form input:not([type="date"]) { flex: 1; }
+.fu-form button { margin: 0; width: auto; }
+.followup.done .title { text-decoration: line-through; color: var(--muted); }
+.followup .row-actions { display: flex; gap: 6px; }
