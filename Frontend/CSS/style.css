@@ -78,3 +78,75 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 /* ---------- Placeholder dashboard ---------- */
 .page { max-width: 900px; margin: 60px auto; padding: 0 20px; }
 .page button { width: auto; padding: 10px 20px; margin-top: 16px; }
+
+/* ---------- App layout (dashboard + later pages) ---------- */
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.nav .brand { font-weight: 700; font-size: 18px; }
+.nav .links { display: flex; gap: 22px; align-items: center; }
+.nav a { color: var(--muted); text-decoration: none; font-size: 14px; }
+.nav a:hover, .nav a.active { color: var(--text); }
+.btn-sm {
+  width: auto;
+  margin: 0;
+  padding: 7px 14px;
+  font-size: 13px;
+}
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.btn-ghost:hover { background: var(--border); }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+.container h1 { font-size: 24px; }
+.container .sub { color: var(--muted); font-size: 14px; margin: 4px 0 24px; }
+
+.grid { display: grid; gap: 16px; }
+.stages { grid-template-columns: repeat(5, 1fr); }
+.two-col { grid-template-columns: 1fr 2fr; margin-top: 16px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+}
+.card h2 { font-size: 15px; color: var(--muted); font-weight: 600; margin-bottom: 14px; }
+
+.stage-card { text-align: center; }
+.stage-card .num { font-size: 32px; font-weight: 700; color: var(--primary); }
+.stage-card .label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+/* Response-rate ring: conic-gradient, no library needed */
+.ring-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.ring {
+  --pct: 0;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: conic-gradient(#f5b83d calc(var(--pct) * 1%), var(--border) 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ring-inner {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: #f5b83d;
+}
+.ring-note { font-size: 13px; color: var(--muted); text-align: center; }

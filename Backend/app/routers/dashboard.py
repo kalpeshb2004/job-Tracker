@@ -65,4 +65,3 @@ def timeline(
         .all()
     )
     return [schemas.TimelinePointOut(month=m, count=c) for m, c in rows]
-
