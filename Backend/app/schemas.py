@@ -1,8 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-
 from datetime import date, datetime
-from pydantic import BaseModel, ConfigDict
 from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 # Allowed stages. Wrong value → FastAPI auto return 422.
 Status = Literal["Applied", "Screening", "Interview", "Offer", "Accepted", "Rejected"]
