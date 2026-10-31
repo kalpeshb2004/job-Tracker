@@ -97,3 +97,40 @@ class FollowUpOut(BaseModel):
 class UpcomingFollowUpOut(FollowUpOut):
     company: str
     role_title: str
+
+
+class DashboardStatsOut(BaseModel):
+    total: int
+    by_status: dict[str, int]
+
+
+class ResponseRateOut(BaseModel):
+    total: int
+    responded: int
+    response_rate: float  # percentage, 0 to 100
+
+
+class TimelinePointOut(BaseModel):
+    month: str  # "2026-10"
+    count: int
+
+# ---------- Admin ----------
+class AdminStatsOut(BaseModel):
+    total_users: int
+    active_users: int
+    total_applications: int
+    applications_per_stage: dict[str, int]
+
+class AdminUserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    email: EmailStr
+    role: str
+    is_active: bool
+    created_at: datetime | None
+    applications_count: int
+
+class AdminUserStatusUpdate(BaseModel):
+    is_active: bool

@@ -5,10 +5,13 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.database import get_db, engine, Base
-from app.routers import auth, applications, followups
+from app.routers import auth, applications, followups, dashboard
+
+from app.routers import auth, applications, followups, admin
 
 # Create missing tables on startup (models must be imported above)
 Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(title="Job Application Tracker")
 
@@ -23,6 +26,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(applications.router)
 app.include_router(followups.router)
+app.include_router(dashboard.router)
+app.include_router(admin.router)
 
 
 @app.get("/", tags=["Health"])
@@ -34,3 +39,4 @@ def root():
 def db_health(db: Session = Depends(get_db)):
     db.execute(text("SELECT 1"))
     return {"database": "connected"}
+
