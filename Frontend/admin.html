@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin | Job Tracker</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav class="nav">
+    <span class="brand">Job Tracker</span>
+    <div class="links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="applications.html">Applications</a>
+      <a href="admin.html" class="active">Admin</a>
+      <button class="btn-sm btn-ghost" id="logoutBtn">Logout</button>
+    </div>
+  </nav>
+
+  <main class="container">
+    <h1>Admin panel</h1>
+    <p class="sub">Platform usage and user management</p>
+
+    <div id="banner" class="banner hidden"></div>
+
+    <!-- API 1: GET /admin/stats -->
+    <section class="grid cols3" id="totals"></section>
+    <section class="grid cols6" id="stages"></section>
+
+    <!-- API 2: GET /admin/users -->
+    <section style="margin-top:28px">
+      <h2 style="font-size:18px">Users</h2>
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Search name or email..." />
+        <select id="activeFilter">
+          <option value="">All users</option>
+          <option value="true">Active only</option>
+          <option value="false">Deactivated only</option>
+        </select>
+      </div>
+
+      <div class="card table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Name</th><th>Email</th><th>Role</th>
+              <th>Status</th><th>Apps</th><th>Joined</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <p class="empty hidden" id="empty" style="padding:18px">No users found.</p>
+      </div>
+
+      <div class="pager">
+        <button class="btn-sm btn-ghost" id="prevBtn">Prev</button>
+        <span id="pageInfo">Page 1</span>
+        <button class="btn-sm btn-ghost" id="nextBtn">Next</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- API 5: user's applications popup -->
+  <dialog id="dlg" class="wide">
+    <div class="dlg-head">
+      <h2 id="dlgTitle">Applications</h2>
+      <button class="btn-sm btn-ghost" id="closeBtn">Close</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Company</th><th>Role</th><th>Stage</th><th>Applied</th><th>Source</th></tr>
+        </thead>
+        <tbody id="appsBody"></tbody>
+      </table>
+      <p class="empty hidden" id="appsEmpty">This user has no applications.</p>
+    </div>
+    <p class="msg error" id="dlgMsg"></p>
+  </dialog>
+
+  <script src="js/api.js"></script>
+  <script>
+    Auth.requireLogin();
+
+    const $ = (id) => document.getElementById(id);
+    const PAGE_SIZE = 10;
+
+    let me = null;
+    let page = 0;
+    let hasNext = false;
+    let rows = [];
+    let reqId = 0;   // drop stale responses
+
+    function showError(text) {
+      $("banner").textContent = text;     // textContent = XSS safe
+      $("banner").classList.remove("hidden");
+    }
+    function clearError() { $("banner").classList.add("hidden"); }
+
+    function cell(text, className) {
+      const td = document.createElement("td");
+      if (className) td.className = className;
+      td.textContent = text ?? "-";
+      return td;
+    }
+
+    function badgeCell(text, cls) {
+      const td = document.createElement("td");
+      const span = document.createElement("span");
+      span.className = `badge ${cls}`;
+      span.textContent = text;
+      td.appendChild(span);
+      return td;
+    }
+
+    function statCard(value, label) {
+      const card = document.createElement("div");
+      card.className = "card stage-card";
+      const num = document.createElement("div");
+      num.className = "num";
+      num.textContent = value;
+      const lab = document.createElement("div");
+      lab.className = "label";
+      lab.textContent = label;
+      card.append(num, lab);
+      return card;
+    }
+
+    // ---------- API 1: stats ----------
+    async function loadStats() {
+      try {
+        const s = await apiFetch("/admin/stats");
+        $("totals").replaceChildren(
+          statCard(s.total_users, "Total users"),
+          statCard(s.active_users, "Active users"),
+          statCard(s.total_applications, "Total applications"),
+        );
+        const stages = $("stages");
+        stages.replaceChildren();
+        Object.entries(s.applications_per_stage).forEach(([stage, count]) => {
+          stages.appendChild(statCard(count, stage));
+        });
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    // ---------- API 2: users list ----------
+    async function loadUsers() {
+      const my = ++reqId;
+      // Ask 1 extra row. If it comes back, a next page exists.
+      const params = new URLSearchParams({ limit: PAGE_SIZE + 1, offset: page * PAGE_SIZE });
+      const q = $("search").value.trim();
+      if (q) params.set("search", q);
+      if ($("activeFilter").value) params.set("is_active", $("activeFilter").value);
+
+      try {
+        const data = await apiFetch(`/admin/users?${params}`);
+        if (my !== reqId) return;
+        clearError();
+        hasNext = data.length > PAGE_SIZE;
+        rows = data.slice(0, PAGE_SIZE);
+        renderUsers();
+      } catch (err) {
+        if (my === reqId) showError(err.message);
+      }
+    }
+
+    function renderUsers() {
+      const tbody = $("tbody");
+      tbody.replaceChildren();
+      $("empty").classList.toggle("hidden", rows.length > 0);
+
+      rows.forEach((u) => {
+        const isSelf = u.id === me.id;
+        const isAdmin = u.role === "admin";
+        const tr = document.createElement("tr");
+
+        tr.append(
+          cell(u.id),
+          cell(u.name, "company"),
+          cell(u.email),
+          badgeCell(u.role, isAdmin ? "admin" : "on"),
+          badgeCell(u.is_active ? "Active" : "Deactivated", u.is_active ? "on" : "off"),
+          cell(u.applications_count),
+          cell(u.created_at ? u.created_at.slice(0, 10) : "-"),
+        );
+
+        const td = document.createElement("td");
+        td.className = "actions";
+
+        // API 5: view applications
+        const view = document.createElement("button");
+        view.className = "btn-sm btn-ghost";
+        view.textContent = "View apps";
+        view.addEventListener("click", () => openApps(u));
+
+        // API 3: activate / deactivate
+        const toggle = document.createElement("button");
+        toggle.className = u.is_active ? "btn-sm btn-warn" : "btn-sm btn-ghost";
+        toggle.textContent = u.is_active ? "Deactivate" : "Activate";
+        toggle.disabled = isSelf;                       // backend also blocks this
+        toggle.title = isSelf ? "You cannot change your own status" : "";
+        toggle.addEventListener("click", () => setStatus(u));
+
+        // API 4: delete
+        const del = document.createElement("button");
+        del.className = "btn-sm btn-danger";
+        del.textContent = "Delete";
+        del.disabled = isSelf || isAdmin;               // backend also blocks this
+        del.title = isSelf || isAdmin ? "Admin accounts cannot be deleted" : "";
+        del.addEventListener("click", () => removeUser(u));
+
+        td.append(view, toggle, del);
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      });
+
+      $("pageInfo").textContent = `Page ${page + 1}`;
+      $("prevBtn").disabled = page === 0;
+      $("nextBtn").disabled = !hasNext;
+    }
+
+    // ---------- API 3: PATCH status ----------
+    async function setStatus(u) {
+      const next = !u.is_active;
+      const verb = next ? "activate" : "deactivate";
+      if (!confirm(`Do you want to ${verb} ${u.email}?`)) return;
+      try {
+        await apiFetch(`/admin/users/${u.id}/status`, { method: "PATCH", json: { is_active: next } });
+        loadUsers();
+        loadStats();
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    // ---------- API 4: DELETE user ----------
+    async function removeUser(u) {
+      const ok = confirm(
+        `PERMANENTLY delete ${u.email}?\n\nThis also deletes ${u.applications_count} application(s) and all follow-ups. This cannot be undone.`
+      );
+      if (!ok) return;
+      try {
+        await apiFetch(`/admin/users/${u.id}`, { method: "DELETE" });
+        if (rows.length === 1 && page > 0) page--;      // last row on page → go back
+        loadUsers();
+        loadStats();
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    // ---------- API 5: user's applications ----------
+    async function openApps(u) {
+      $("dlgTitle").textContent = `Applications of ${u.name}`;
+      $("dlgMsg").textContent = "";
+      $("appsBody").replaceChildren();
+      $("appsEmpty").classList.add("hidden");
+      $("dlg").showModal();
+      try {
+        const apps = await apiFetch(`/admin/users/${u.id}/applications?limit=50`);
+        $("appsEmpty").classList.toggle("hidden", apps.length > 0);
+        apps.forEach((a) => {
+          const tr = document.createElement("tr");
+          tr.append(cell(a.company, "company"), cell(a.role_title), cell(a.status), cell(a.applied_date), cell(a.source));
+          $("appsBody").appendChild(tr);
+        });
+      } catch (err) {
+        $("dlgMsg").textContent = err.message;
+      }
+    }
+
+    // ---------- Events ----------
+    $("closeBtn").addEventListener("click", () => $("dlg").close());
+    $("dlg").addEventListener("click", (e) => { if (e.target === $("dlg")) $("dlg").close(); });
+
+    $("prevBtn").addEventListener("click", () => { if (page > 0) { page--; loadUsers(); } });
+    $("nextBtn").addEventListener("click", () => { if (hasNext) { page++; loadUsers(); } });
+    $("activeFilter").addEventListener("change", () => { page = 0; loadUsers(); });
+
+    let timer;   // debounce search
+    $("search").addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { page = 0; loadUsers(); }, 300);
+    });
+
+    $("logoutBtn").addEventListener("click", () => Auth.logout());
+
+    // ---------- Start ----------
+    (async () => {
+      try {
+        me = await apiFetch("/auth/me");
+      } catch (err) {
+        showError(err.message);
+        return;
+      }
+      // UX guard only. Real security = backend require_admin (403)
+      if (me.role !== "admin") {
+        window.location.href = "dashboard.html";
+        return;
+      }
+      loadStats();
+      loadUsers();
+    })();
+  </script>
+</body>
+</html>
