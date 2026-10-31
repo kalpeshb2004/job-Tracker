@@ -8,6 +8,7 @@ from app import models, schemas
 from app.database import get_db
 from app.security import require_admin
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 # dependencies=[...] = EVERY route in this router is admin-only (403 for normal user)
 router = APIRouter(
@@ -123,3 +124,26 @@ def set_user_status(
         created_at=user.created_at,
         applications_count=applications_count,
     )
+
+# ---------- Admin API 4: DELETE /admin/users/{user_id} ----------
+# Permanently delete a user + all their applications and follow-ups (cascade)
+@router.delete("/users/{user_id}", status_code=204)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(require_admin),
+):
+    if user_id == admin.id:
+        raise HTTPException(status_code=400, detail="You cannot delete yourself")
+
+    user = db.get(models.User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Other admin must be demoted first. Stops accidental admin wipe.
+    if user.role == "admin":
+        raise HTTPException(status_code=400, detail="Cannot delete an admin account")
+
+    db.delete(user)  # ORM cascade removes applications → follow-ups
+    db.commit()
+    return Response(status_code=204)
